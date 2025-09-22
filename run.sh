@@ -13,8 +13,8 @@
 
 module load python3/3.10.5/gcc-9.3.0 # available python
 module load libs/nvidia-cuda/12.4.0/bin # cuda
-source /mnt/scratch2/users/40460549/cpt-dail/myenv_new/bin/activate
-pip install --no-cache-dir -r "requirements.txt"
+source /mnt/scratch2/users/40460549/cpt-dail/awq_env/bin/activate
+pip install -r "requirements.txt"
 cd $SLURM_SUBMIT_DIR
 
 export HF_TOKEN="hf_your_token_here"
