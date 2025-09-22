@@ -8,18 +8,18 @@ logging.basicConfig(level=logging.INFO)
 
 
 # Paths
-folder = "jmcinern/qwen3-8B-cpt-sft/"   
-SFT_subfolder = "qwen3-8B-cpt-sft-full"
 local_quant_path = "./8B-sft-full-awq-quant"        
 repo_id = "jmcinern/qwen3-8B-sft-awq"   
 hf_token = os.environ["HF_TOKEN"]
+folder = "jmcinern/qwen3-8B-cpt-sft/qwen3-8B-cpt-sft-full"
+
 
 
 # Load model + tokenizer
-model = AutoAWQForCausalLM.from_pretrained(folder, subfolder= SFT_subfolder, trust_remote_code=True)
-tokenizer = AutoTokenizer.from_pretrained(folder, subfolder= SFT_subfolder, trust_remote_code=True)
+model = AutoAWQForCausalLM.from_pretrained(folder, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(folder, trust_remote_code=True)
 
-# data is a mix of Irish and English sentences split by \n
+# data is a mix of Irish and English sentences split by 
 with open("calibration_mix.txt", "r", encoding="utf-8") as f:
     ga_en_calib_data = f.read().splitlines()
     ga_en_calib_data = [line for line in ga_en_calib_data]
