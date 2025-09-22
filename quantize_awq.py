@@ -22,9 +22,9 @@ tokenizer = AutoTokenizer.from_pretrained(folder, subfolder= SFT_subfolder, trus
 # data is a mix of Irish and English sentences split by \n
 with open("calibration_mix.txt", "r", encoding="utf-8") as f:
     ga_en_calib_data = f.read().splitlines()
-    # filter by > 30 chars
-    ga_en_calib_data = [line for line in ga_en_calib_data if len(line) > 30]
+    ga_en_calib_data = [line for line in ga_en_calib_data]
 print(f"Calibration sentences: {len(ga_en_calib_data)}")
+
 quant_config = {
     "w_bit": 4,
     "q_group_size": 128,

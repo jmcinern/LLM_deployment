@@ -21,8 +21,11 @@ def load_sentences(path, n=1000):
 en_calib_data = load_sentences(en_path, 1000)
 ga_calib_data = load_sentences(ga_path, 1000)
 
-# combine and shuffle
-calib_data = en_calib_data + ga_calib_data
+# get sentences over 30 chars
+ga_calib_data = [s for s in ga_calib_data if len(s) > 50]
+en_calib_data = [s for s in en_calib_data if len(s) > 50]
+# combine and shuffle, taking only 500 from each
+calib_data = en_calib_data[:500] + ga_calib_data[:500]
 random.shuffle(calib_data)
 
 print(f"Total sentences: {len(calib_data)}")
