@@ -9,15 +9,15 @@ logging.basicConfig(level=logging.INFO)
 
 # Paths
 local_quant_path = "./8B-sft-full-awq-quant"        
-repo_id = "jmcinern/qwen3-8B-sft-awq"   
+repo_id_awq = "jjmcinern/qwen3-8B-cpt-sft"   
 hf_token = os.environ["HF_TOKEN"]
-folder = "jmcinern/qwen3-8B-cpt-sft/qwen3-8B-cpt-sft-full"
-
+repo_id   = "jmcinern/qwen3-8B-cpt-sft"
+subfolder = "qwen3-8B-cpt-sft-full"
 
 
 # Load model + tokenizer
-model = AutoAWQForCausalLM.from_pretrained(folder, trust_remote_code=True)
-tokenizer = AutoTokenizer.from_pretrained(folder, trust_remote_code=True)
+model = AutoAWQForCausalLM.from_pretrained(repo_id, subfolder=subfolder, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(repo_id, subfolder=subfolder, trust_remote_code=True)
 
 # data is a mix of Irish and English sentences split by 
 with open("calibration_mix.txt", "r", encoding="utf-8") as f:
@@ -45,4 +45,4 @@ tokenizer.save_pretrained(local_quant_path)
 
 # push to hf
 model.push_to_hub(repo_id, token=hf_token)
-tokenizer.push_to_hub(repo_id, token=hf_token)
+tokenizer.push_to_hub(repo_id_awq, token=hf_token)
