@@ -2,3 +2,4 @@ autoawq==0.2.7
 autoawq-kernels==0.0.9
 transformers>=4.47.1
 torch==2.5.1
+awq
