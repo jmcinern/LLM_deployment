@@ -3,7 +3,7 @@
 # use llmcompressor to quantize the model with awq using the calibration data
 import json
 from datasets import Dataset
-from llmcompressor import oneshot  # UPDATED: import oneshot from top-level package
+from llmcompressor import oneshot  
 from transformers import AutoTokenizer, AutoModelForCausalLM  # UPDATED: use AutoModelForCausalLM
 import torch
 
@@ -47,20 +47,16 @@ default_modifiers:
     scheme: W4A16
 """
     
-    # Load model (UPDATED: use AutoModelForCausalLM)
-    print("Loading model...")
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        subfolder=model_subfolder,
-        device_map="auto",
-        torch_dtype=torch.float16,
-        trust_remote_code=True
-    )
-    
     # Apply quantization using oneshot
     print("Applying AWQ quantization...")
     oneshot(
-        model=model,
+        model=model_id,
+        model_kwargs={
+            "subfolder": model_subfolder,
+            "device_map": "auto",
+            "torch_dtype": torch.float16,
+            "trust_remote_code": True
+        },
         dataset=calibration_dataset,
         recipe=recipe,
         tokenizer=tokenizer,
