@@ -1,48 +1,84 @@
-from awq import AutoAWQForCausalLM
+# load calibration data from ./awq_calibration_data.jsonl which has the "text" field
+# the model is on HF at: jmcinern/qwen3-8B-cpt-sft/qwen3-8B-cpt-sft-full
+# use llmcompressor to quantize the model with awq using the calibration data
+import json
+from datasets import Dataset
+from llmcompressor.transformers import SparseAutoModelForCausalLM
 from transformers import AutoTokenizer
-import os
-import logging
+import torch
 
-# to log awq progress
-logging.basicConfig(level=logging.INFO)
+def load_calibration_data(file_path):
+    """Load calibration data from JSONL file"""
+    data = []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            item = json.loads(line.strip())
+            data.append(item['text'])
+    return data
 
+def main():
+    # Configuration
+    model_id = "jmcinern/qwen3-8B-cpt-sft/qwen3-8B-cpt-sft-full"
+    calibration_file = "./awq_calibration_data.jsonl"
+    output_dir = "./quantized_model_awq"
+    
+    # Load calibration data
+    print("Loading calibration data...")
+    calibration_texts = load_calibration_data(calibration_file)
+    print(f"Loaded {len(calibration_texts)} calibration samples")
+    
+    # Create dataset
+    calibration_dataset = Dataset.from_dict({"text": calibration_texts})
+    
+    # Load tokenizer
+    print("Loading tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    # AWQ quantization recipe
+    recipe = """
+    quant_stage:
+      quant_modifiers:
+        QuantizationModifier:
+          ignore: ["lm_head"]
+          config_groups:
+            group_0:
+              weights:
+                num_bits: 4
+                type: "int"
+                symmetric: true
+                strategy: "channel"
+              input_activations:
+                num_bits: 16
+                type: "float"
+              targets: ["Linear"]
+    """
+    
+    # Load and quantize model
+    print("Loading and quantizing model...")
+    model = SparseAutoModelForCausalLM.from_pretrained(
+        model_id,
+        device_map="auto",
+        torch_dtype=torch.float16,
+        trust_remote_code=True
+    )
+    
+    # Apply quantization
+    model.apply(
+        recipe=recipe,
+        dataloader=calibration_dataset,
+        tokenizer=tokenizer,
+        num_calibration_samples=min(256, len(calibration_texts)),
+        max_seq_length=2048
+    )
+    
+    # Save quantized model
+    print(f"Saving quantized model to {output_dir}...")
+    model.save_pretrained(output_dir, save_compressed=True)
+    tokenizer.save_pretrained(output_dir)
+    
+    print("Quantization completed successfully!")
 
-# Paths
-local_quant_path = "./8B-sft-full-awq-quant"        
-repo_id_awq = "jjmcinern/qwen3-8B-cpt-sft"   
-hf_token = os.environ["HF_TOKEN"]
-repo_id   = "jmcinern/qwen3-8B-cpt-sft"
-subfolder = "qwen3-8B-cpt-sft-full"
-
-
-# Load model + tokenizer
-model = AutoAWQForCausalLM.from_pretrained(repo_id, subfolder=subfolder, trust_remote_code=True)
-tokenizer = AutoTokenizer.from_pretrained(repo_id, subfolder=subfolder, trust_remote_code=True)
-
-# data is a mix of Irish and English sentences split by 
-with open("calibration_mix.txt", "r", encoding="utf-8") as f:
-    ga_en_calib_data = f.read().splitlines()
-    ga_en_calib_data = [line for line in ga_en_calib_data]
-print(f"Calibration sentences: {len(ga_en_calib_data)}")
-
-quant_config = {
-    "w_bit": 4,
-    "q_group_size": 128,
-    "zero_point": True,
-    "duo_scaling": True,
-    "max_calib_samples": 256,
-    "max_calib_seq_len": 512
-}
-# Run AWQ quantization (defaults: 4-bit, group size 128)
-model.quantize(tokenizer, 
-               calib_data = ga_en_calib_data,
-               quant_config=quant_config,
-               )
-
-# save quantized model to huggingface
-model.save_quantized(local_quant_path, safetensors=True)
-tokenizer.save_pretrained(local_quant_path)
-
-# push to hf
-model.push_to_hub(repo_id, token=hf_token)
-tokenizer.push_to_hub(repo_id_awq, token=hf_token)
+if __name__ == "__main__":
+    main()
