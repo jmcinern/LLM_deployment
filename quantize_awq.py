@@ -51,12 +51,10 @@ default_modifiers:
     print("Applying AWQ quantization...")
     oneshot(
         model=model_id,
-        model_kwargs={
-            "subfolder": model_subfolder,
-            "device_map": "auto",
-            "torch_dtype": torch.float16,
-            "trust_remote_code": True
-        },
+        subfolder=model_subfolder,  
+        device_map="auto",         
+        torch_dtype="auto",         
+        trust_remote_code=True,     
         dataset=calibration_dataset,
         recipe=recipe,
         tokenizer=tokenizer,
