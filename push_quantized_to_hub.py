@@ -2,8 +2,12 @@ import os
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from huggingface_hub import login, HfApi
 import torch
+import shutil
+
 
 def push_to_hub():
+    shutil.rmtree(os.path.expanduser("~/.cache/huggingface"), ignore_errors=True)
+    print("✓ Cleared HuggingFace cache")
     # Configuration
     local_model_dir = "./quantized_model_awq"
     hub_repo_name = "jmcinern/qwen3-8B-cpt-sft-awq"  # Your new repo name
