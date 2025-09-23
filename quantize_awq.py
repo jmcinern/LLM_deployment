@@ -3,8 +3,8 @@
 # use llmcompressor to quantize the model with awq using the calibration data
 import json
 from datasets import Dataset
-from llmcompressor.transformers import SparseAutoModelForCausalLM
-from transformers import AutoTokenizer
+from llmcompressor import oneshot  # UPDATED: import oneshot from top-level package
+from transformers import AutoTokenizer, AutoModelForCausalLM  # UPDATED: use AutoModelForCausalLM
 import torch
 
 def load_calibration_data(file_path):
@@ -37,28 +37,19 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # AWQ quantization recipe
+    # AWQ quantization recipe (UPDATED: use AWQModifier)
     recipe = """
-    quant_stage:
-      quant_modifiers:
-        QuantizationModifier:
-          ignore: ["lm_head"]
-          config_groups:
-            group_0:
-              weights:
-                num_bits: 4
-                type: "int"
-                symmetric: true
-                strategy: "channel"
-              input_activations:
-                num_bits: 16
-                type: "float"
-              targets: ["Linear"]
-    """
+default_stage:
+default_modifiers:
+  AWQModifier:
+    targets: [Linear]
+    ignore: [lm_head]
+    scheme: W4A16
+"""
     
-    # Load and quantize model
-    print("Loading and quantizing model...")
-    model = SparseAutoModelForCausalLM.from_pretrained(
+    # Load model (UPDATED: use AutoModelForCausalLM)
+    print("Loading model...")
+    model = AutoModelForCausalLM.from_pretrained(
         model_id,
         subfolder=model_subfolder,
         device_map="auto",
@@ -66,19 +57,17 @@ def main():
         trust_remote_code=True
     )
     
-    # Apply quantization
-    model.apply(
+    # Apply quantization using oneshot
+    print("Applying AWQ quantization...")
+    oneshot(
+        model=model,
+        dataset=calibration_dataset,
         recipe=recipe,
-        dataloader=calibration_dataset,
         tokenizer=tokenizer,
+        output_dir=output_dir,
         num_calibration_samples=min(256, len(calibration_texts)),
         max_seq_length=2048
     )
-    
-    # Save quantized model
-    print(f"Saving quantized model to {output_dir}...")
-    model.save_pretrained(output_dir, save_compressed=True)
-    tokenizer.save_pretrained(output_dir)
     
     print("Quantization completed successfully!")
 
