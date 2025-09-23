@@ -1,47 +1,58 @@
-import os, json, torch
+import json
 from datasets import Dataset
-from huggingface_hub import snapshot_download
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from llmcompressor import oneshot  # corrected import
+from llmcompressor import oneshot
+from transformers import AutoTokenizer, AutoModelForCausalLM  
+import torch
 
-def load_calibration_data(fp):
-    return [json.loads(l)["text"] for l in open(fp, "r", encoding="utf-8")]
+def load_calibration_data(file_path):
+    """Load calibration data from JSONL file"""
+    data = []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            item = json.loads(line.strip())
+            data.append(item['text'])
+    return data
 
 def main():
-    repo = "jmcinern/qwen3-8B-cpt-sft"
-    sub  = "qwen3-8B-cpt-sft-full"
+    # Configuration
+    model_id = "jmcinern/qwen3-8B-cpt-sft"
+    model_subfolder = "qwen3-8B-cpt-sft-full"
     calibration_file = "./awq_calibration_data.jsonl"
     output_dir = "./quantized_model_awq"
-    cache_dir = os.path.expanduser("~/.cache/hf_qwen")  # your custom cache
-
-    # 1) Ensure subfolder is cached (first run downloads once; then reuse)
-    snap = snapshot_download(
-        repo_id=repo,
-        allow_patterns=f"{sub}/*",
-        cache_dir=cache_dir,
-        local_files_only=False,   # set True if you know it's already cached
-        revision="main",
-    )
-    local_sub = os.path.join(snap, sub)
-
-    # 2) Load tokenizer/model from LOCAL path; force offline reuse
-    tokenizer = AutoTokenizer.from_pretrained(local_sub, trust_remote_code=True, local_files_only=True)
+    
+    # Load calibration data
+    print("Loading calibration data...")
+    calibration_texts = load_calibration_data(calibration_file)
+    print(f"Loaded {len(calibration_texts)} calibration samples")
+    
+    # Create dataset
+    calibration_dataset = Dataset.from_dict({"text": calibration_texts})
+    
+    # Load tokenizer
+    print("Loading tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(model_id, subfolder=model_subfolder, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-
+    
+    # Load model
+    print("Loading model...")
     model = AutoModelForCausalLM.from_pretrained(
-        local_sub,
-        trust_remote_code=True,
-        torch_dtype=torch.float16,
+        model_id,
+        subfolder=model_subfolder,    
         device_map="auto",
-        local_files_only=True,
+        torch_dtype=torch.float16,    
+        trust_remote_code=True,
     )
-    # Prevent hub lookups during save
-    model.config._name_or_path = local_sub
-
-    # 3) Dataset + recipe
-    calibration_texts = load_calibration_data(calibration_file)
-    calibration_dataset = Dataset.from_dict({"text": calibration_texts})
+    
+    # CRITICAL FIX: Clear the problematic subfolder path for save_pretrained()
+    # save_pretrained() expects a clean model name, not a path with subfolders
+    model.config._name_or_path = output_dir  # Point to where it will be saved
+    if hasattr(model, 'name_or_path'):
+        model.name_or_path = output_dir
+    
+    print(f"Model path cleared for save_pretrained compatibility")
+    
+    # AWQ quantization recipe
     recipe = """
 default_stage:
 default_modifiers:
@@ -50,16 +61,20 @@ default_modifiers:
     ignore: [lm_head]
     scheme: W4A16
 """
-
+    
+    # Apply quantization using oneshot
+    print("Applying AWQ quantization...")
     oneshot(
-        model=model,
-        tokenizer=tokenizer,
+        model=model,  
         dataset=calibration_dataset,
         recipe=recipe,
+        tokenizer=tokenizer,
         output_dir=output_dir,
         num_calibration_samples=min(256, len(calibration_texts)),
-        max_seq_length=2048,
+        max_seq_length=2048
     )
+    
+    print("Quantization completed successfully!")
 
 if __name__ == "__main__":
     main()
