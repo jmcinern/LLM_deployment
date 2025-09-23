@@ -18,7 +18,8 @@ def load_calibration_data(file_path):
 
 def main():
     # Configuration
-    model_id = "jmcinern/qwen3-8B-cpt-sft/qwen3-8B-cpt-sft-full"
+    model_id = "jmcinern/qwen3-8B-cpt-sft"
+    model_subfolder = "qwen3-8B-cpt-sft-full"
     calibration_file = "./awq_calibration_data.jsonl"
     output_dir = "./quantized_model_awq"
     
@@ -32,7 +33,7 @@ def main():
     
     # Load tokenizer
     print("Loading tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    tokenizer = AutoTokenizer.from_pretrained(model_id, subfolder=model_subfolder)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
@@ -59,6 +60,7 @@ def main():
     print("Loading and quantizing model...")
     model = SparseAutoModelForCausalLM.from_pretrained(
         model_id,
+        subfolder=model_subfolder,
         device_map="auto",
         torch_dtype=torch.float16,
         trust_remote_code=True
