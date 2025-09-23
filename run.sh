@@ -10,14 +10,6 @@
 #SBATCH --mem=64G
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=josephmcinerney7575@gmail.com
-'''
-module load python3/3.10.5/gcc-9.3.0 # available python
-module load libs/nvidia-cuda/12.4.0/bin # cuda
-source /mnt/scratch2/users/40460549/cpt-dail/awq_env/bin/activate
-cd $SLURM_SUBMIT_DIR
-pip install -r requirements.txt
-
-'''
 
 # run it
 python quantize_awq.py
